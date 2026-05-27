@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cmath>
+#include <deque>
 #include <SFML/Graphics.hpp>
 using namespace std;
 
@@ -46,7 +47,7 @@ int main()
     theta2 = theta2 * M_PI / 180.0; // Convert to radians
 
     sf::RenderWindow window(sf::VideoMode({800, 600}), "Pendulum Simulation");
-    window.setFramerateLimit(1 / timeStep);
+    // window.setFramerateLimit(1 / timeStep);
 
     // The pendulum
     sf::CircleShape bob1(10), bob2(10);
@@ -71,6 +72,8 @@ int main()
     sf::Clock fpsClock;
     int frameCount = 0;
 
+    float px,py;
+
     while (window.isOpen())
     {
         while (const std::optional event = window.pollEvent())
@@ -81,12 +84,20 @@ int main()
             }
         }
 
+        px = x2;
+        py = y2;
+
         calc_position(theta1, theta2, omega1, omega2, x1, y1, x2, y2);
 
         bob1.setPosition({400 + x1 * 100 - 10, 300 + y1 * 100 - 10});
         line1[1].position = line2[0].position = sf::Vector2f(400 + x1 * 100, 300 + y1 * 100);
         bob2.setPosition({400 + x2 * 100 - 10, 300 + y2 * 100 - 10});
         line2[1].position = sf::Vector2f(400 + x2 * 100, 300 + y2 * 100);
+
+        sf::Vertex trailLine[] =
+        {
+            sf::Vertex{sf::Vector2f(400 + px * 100, 300 + py * 100)},
+            sf::Vertex{sf::Vector2f(400 + x2 * 100, 300 + y2 * 100)}};
 
         ++frameCount;
         if (fpsClock.getElapsedTime().asSeconds() >= 1.0f)
@@ -96,11 +107,13 @@ int main()
             fpsClock.restart();
         }
 
-        window.clear();
-        window.draw(line1, 2, sf::PrimitiveType::Lines);
-        window.draw(line2, 2, sf::PrimitiveType::Lines);
-        window.draw(bob1);
-        window.draw(bob2);
+        // window.clear();
+        // window.draw(line1, 2, sf::PrimitiveType::Lines);
+        // window.draw(line2, 2, sf::PrimitiveType::Lines);
+        // window.draw(bob1);
+        // window.draw(bob2);
+        if (frameCount % 5 == 0)
+        {window.draw(trailLine, 2, sf::PrimitiveType::Lines);}
         // window.draw(joint);
         window.display();
     }

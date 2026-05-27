@@ -12,12 +12,11 @@ const float l = 1.0;         // Length of the pendulum
 inline void calc_position(float &theta1, float &theta2, float &omega1,
                           float &omega2, float &x1, float &y1, float &x2, float &y2)
 {
-    float alpha1 = (-g * (3.0f * sin(theta1) + sin(theta1 - 2.0f * theta2)) - 
-                    2.0f * sin(theta1 - theta2) * (omega2 * omega2 * l + omega1 * omega1 * l * cos(theta1 - theta2))) / 
+    float alpha1 = (-g * (3.0f * sin(theta1) + sin(theta1 - 2.0f * theta2)) -
+                    2.0f * sin(theta1 - theta2) * (omega2 * omega2 * l + omega1 * omega1 * l * cos(theta1 - theta2))) /
                    (l * (3.0f - cos(2.0f * theta1 - 2.0f * theta2)));
 
-    float alpha2 = (2.0f * sin(theta1 - theta2) * (2.0f * omega1 * omega1 * l + 
-                    2.0f * g * cos(theta1) + omega2 * omega2 * l * cos(theta1 - theta2))) / 
+    float alpha2 = (2.0f * sin(theta1 - theta2) * (2.0f * omega1 * omega1 * l + 2.0f * g * cos(theta1) + omega2 * omega2 * l * cos(theta1 - theta2))) /
                    (l * (3.0f - cos(2.0f * theta1 - 2.0f * theta2)));
 
     omega1 += alpha1 * timeStep;
@@ -30,7 +29,6 @@ inline void calc_position(float &theta1, float &theta2, float &omega1,
     y1 = l * cos(theta1);
     x2 = l * sin(theta2) + x1;
     y2 = l * cos(theta2) + y1;
-
 }
 
 int main()
@@ -72,7 +70,8 @@ int main()
     sf::Clock fpsClock;
     int frameCount = 0;
 
-    float px,py;
+    float px, py;
+    bool firstFrame = true;
 
     while (window.isOpen())
     {
@@ -95,9 +94,9 @@ int main()
         line2[1].position = sf::Vector2f(400 + x2 * 100, 300 + y2 * 100);
 
         sf::Vertex trailLine[] =
-        {
-            sf::Vertex{sf::Vector2f(400 + px * 100, 300 + py * 100)},
-            sf::Vertex{sf::Vector2f(400 + x2 * 100, 300 + y2 * 100)}};
+            {
+                sf::Vertex{sf::Vector2f(400 + px * 100, 300 + py * 100)},
+                sf::Vertex{sf::Vector2f(400 + x2 * 100, 300 + y2 * 100)}};
 
         ++frameCount;
         if (fpsClock.getElapsedTime().asSeconds() >= 1.0f)
@@ -112,8 +111,14 @@ int main()
         // window.draw(line2, 2, sf::PrimitiveType::Lines);
         // window.draw(bob1);
         // window.draw(bob2);
-        if (frameCount % 5 == 0)
-        {window.draw(trailLine, 2, sf::PrimitiveType::Lines);}
+        if (firstFrame)
+        {
+            firstFrame = false;
+        }
+        else
+        {
+            window.draw(trailLine, 2, sf::PrimitiveType::Lines);
+        }
         // window.draw(joint);
         window.display();
     }

@@ -11,16 +11,25 @@ const float l = 1.0;         // Length of the pendulum
 inline void calc_position(float &theta1, float &theta2, float &omega1,
                           float &omega2, float &x1, float &y1, float &x2, float &y2)
 {
+    float alpha1 = (-g * (3.0f * sin(theta1) + sin(theta1 - 2.0f * theta2)) - 
+                    2.0f * sin(theta1 - theta2) * (omega2 * omega2 * l + omega1 * omega1 * l * cos(theta1 - theta2))) / 
+                   (l * (3.0f - cos(2.0f * theta1 - 2.0f * theta2)));
+
+    float alpha2 = (2.0f * sin(theta1 - theta2) * (2.0f * omega1 * omega1 * l + 
+                    2.0f * g * cos(theta1) + omega2 * omega2 * l * cos(theta1 - theta2))) / 
+                   (l * (3.0f - cos(2.0f * theta1 - 2.0f * theta2)));
+
+    omega1 += alpha1 * timeStep;
+    omega2 += alpha2 * timeStep;
+
+    theta1 += omega1 * timeStep;
+    theta2 += omega2 * timeStep;
+
     x1 = l * sin(theta1);
     y1 = l * cos(theta1);
     x2 = l * sin(theta2) + x1;
     y2 = l * cos(theta2) + y1;
 
-    omega2 -= (g * sin(theta2) / l + omega1 * omega1 * sin(theta1 - theta2)) * timeStep;
-    omega1 -= (g * sin(theta1) / l + sin(theta1 - theta2) * (g * cos(theta2) / l + omega2 * omega2 + omega1 * omega1 * cos(theta2 - theta1))) * timeStep;
-
-    theta2 += (omega2 + omega1) * timeStep;
-    theta1 += omega1 * timeStep;
 }
 
 int main()
@@ -37,7 +46,7 @@ int main()
     theta2 = theta2 * M_PI / 180.0; // Convert to radians
 
     sf::RenderWindow window(sf::VideoMode({800, 600}), "Pendulum Simulation");
-    // window.setFramerateLimit(1 / timeStep);
+    window.setFramerateLimit(1 / timeStep);
 
     // The pendulum
     sf::CircleShape bob1(10), bob2(10);

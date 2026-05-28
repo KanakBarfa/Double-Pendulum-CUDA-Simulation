@@ -5,6 +5,7 @@
 #include <vector>
 #include <algorithm>
 #include <SFML/Graphics.hpp>
+#include <omp.h>
 #define M_PII 3.14159265358979323846f
 #define MAX_ITER 5000
 #define N 1000
@@ -93,6 +94,7 @@ int main() {
             break;
         }
 
+        #pragma omp parallel for schedule(dynamic)
         for (int i = 0; i < N*N; ++i) {
 
             if (flipped[i]) continue;
@@ -101,8 +103,8 @@ int main() {
 
             if (std::abs(states[i][0]) > M_PII || std::abs(states[i][1]) > M_PII) {
                 pixels[4*i] = 255 * (counter / static_cast<float>(MAX_ITER));
-                pixels[4*i + 1] = 0;
-                pixels[4*i + 2] = 255 - 255 * (counter / static_cast<float>(MAX_ITER));
+                pixels[4*i + 1] = 255 - 255 * (counter / static_cast<float>(MAX_ITER));
+                pixels[4*i + 2] = 0;
                 pixels[4*i + 3] = 255;
                 flipped[i] = true;
             }

@@ -134,6 +134,43 @@ void render_graph(int *final)
     }
 }
 
+void render_video(int *final, int fps)
+{
+    std::vector<std::uint8_t> pixels(N * N * 4, 255);
+
+    std::string cmd = "ffmpeg -y -f rawvideo -vcodec rawvideo -pix_fmt rgba -s " + 
+                      std::to_string(N) + "x" + std::to_string(N) + 
+                      " -r " + std::to_string(fps) + 
+                      " -i - -c:v libx264 -preset fast -crf 18 -pix_fmt yuv420p output.mp4";
+    
+    FILE* ffmpeg = popen(cmd.c_str(), "w");
+
+    for (int counter = 1; counter <= MAX_ITER; ++counter)
+    {
+        float t = counter / static_cast<float>(MAX_ITER);
+        t = std::pow(t, 0.4f);
+
+        for (int i = 0; i < N * N; i++)
+        {
+            if (final[i] == counter)
+            {
+                pixels[4 * i] = static_cast<std::uint8_t>(255.0f * std::clamp(t * 3.0f, 0.0f, 1.0f));
+                pixels[4 * i + 1] = static_cast<std::uint8_t>(255.0f * std::clamp(t * 3.0f - 1.0f, 0.0f, 1.0f));
+                pixels[4 * i + 2] = static_cast<std::uint8_t>(255.0f * std::clamp(t * 3.0f - 2.0f, 0.0f, 1.0f));
+                pixels[4 * i + 3] = 255;
+            }
+        }
+        
+        fwrite(pixels.data(), 1, N * N * 4, ffmpeg);
+
+        if (counter % 100 == 0) {
+            std::cout << "Encoded frame " << counter << " / " << MAX_ITER << '\n';
+        }
+    }
+
+    pclose(ffmpeg);
+}
+
 int main()
 {
     int *d_iterations;
@@ -165,6 +202,7 @@ int main()
 
     // Rendering
     render_graph(final);
+    // render_video(final,60);
 
     cudaFreeHost(final);
 }

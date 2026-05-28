@@ -1,21 +1,14 @@
-CXX = g++
+NVCC = nvcc
+NVCCFLAGS = -O3
+LDFLAGS = -lsfml-graphics -lsfml-window -lsfml-system
 
-TARGET = main
+all: main
 
-SRCS = main.cpp
+main: main.cu
+	$(NVCC) $(NVCCFLAGS) main.cu -o main $(LDFLAGS)
 
-OBJS = $(SRCS:.cpp=.o)
-
-all: $(TARGET)
-
-$(TARGET): $(OBJS)
-	$(CXX) -o $(TARGET) -g $(OBJS) -lsfml-graphics -lsfml-window -lsfml-system -fopenmp
-
-%.o: %.cpp
-	$(CXX) -c -g $< -o $@ -fopenmp
-
-run: $(TARGET)
-	./$(TARGET)
+run: main
+	./main
 
 clean:
-	rm -f $(OBJS) $(TARGET)
+	rm -f main

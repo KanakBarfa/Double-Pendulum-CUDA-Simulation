@@ -1,9 +1,9 @@
 #include <iostream>
 #include <cuda_runtime.h>
-#include <vector>
 #include <SFML/Graphics.hpp>
+#include <algorithm>
 #define N 1000
-#define MAX_ITER 50000
+#define MAX_ITER 5000
 #define M_PII 3.14159265358979323846f
 
 const float time_step = 0.01f;
@@ -95,7 +95,7 @@ __global__ void init(float *state, int *d_iter)
 void render_graph(int *final)
 {
     sf::RenderWindow window(sf::VideoMode({N, N}), "Double Pendulum Simulation");
-    std::vector<std::uint8_t> pixels(N * N * 4, 255);
+    std::vector<std::uint8_t> pixels(N * N * 4, 0);
     sf::Texture texture;
     bool flag = texture.resize({N, N});
     texture.update(pixels.data());
@@ -111,26 +111,26 @@ void render_graph(int *final)
                 window.close();
             }
         }
-        counter++;
-        if (counter > MAX_ITER)
+        if (counter < MAX_ITER)
         {
-            break;
-        }
-        for (int i = 0; i < N * N; i++)
-        {
-            if (final[i] == counter)
+            for (int i = 0; i < N * N; i++)
             {
-                pixels[4 * i] = 255 * (counter / static_cast<float>(MAX_ITER));
-                pixels[4 * i + 1] = 255 - 255 * (counter / static_cast<float>(MAX_ITER));
-                pixels[4 * i + 2] = 0;
-                pixels[4 * i + 3] = 255;
+                if (final[i] == counter)
+                {
+                    float t = counter / static_cast<float>(MAX_ITER);
+                    t = std::pow(t, 0.4f);
+                    pixels[4 * i] = static_cast<std::uint8_t>(255.0f * std::clamp(t * 3.0f, 0.0f, 1.0f));
+                    pixels[4 * i + 1] = static_cast<std::uint8_t>(255.0f * std::clamp(t * 3.0f - 1.0f, 0.0f, 1.0f));
+                    pixels[4 * i + 2] = static_cast<std::uint8_t>(255.0f * std::clamp(t * 3.0f - 2.0f, 0.0f, 1.0f));
+                    pixels[4 * i + 3] = 255;
+                }
             }
+            texture.update(pixels.data());
+            window.clear();
+            window.draw(sprite);
+            window.setTitle("Iteration: " + std::to_string(++counter));
+            window.display();
         }
-        texture.update(pixels.data());
-        window.clear();
-        window.draw(sprite);
-        window.setTitle("Iteration: " + std::to_string(counter));
-        window.display();
     }
 }
 

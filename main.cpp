@@ -31,13 +31,13 @@ int main()
 {
     ios_base::sync_with_stdio(false);
     cin.tie(nullptr);
-    float theta1 = 45.0;  // Initial angle in degrees
-    float theta2 = 45.0;  // Initial angle in degrees
+    float theta1 = 1.0;  // Initial angle in degrees
+    float theta2 = 5.0;  // Initial angle in degrees
     float omega1 = 0.0;   // Initial angular velocity
     float omega2 = 0.0;   // Initial angular velocity
 
     // cout << "Enter the angle in degrees: ";
-    // cin >> theta1 >> theta2;
+    cin >> theta1 >> theta2;
     theta1 = theta1 * M_PI / 180.0; // Convert to radians
     theta2 = theta2 * M_PI / 180.0; // Convert to radians
 
@@ -55,7 +55,19 @@ int main()
 
         counter++;
 
-        cout<<counter<<" "<<theta1<<" "<<theta2<<'\n';
+        // cout<<counter<<" "<<theta1<<" "<<theta2<<'\n';
+        if (theta1 < - M_PI || theta2 < - M_PI)
+        {
+            break;
+        }
+
+        if (theta1 > M_PI || theta2 > M_PI)
+        {
+            break;
+        }
 
     }
+    cout << "Final angles (degrees): " << theta1 * 180.0 / M_PI << " " << theta2 * 180.0 / M_PI << '\n';
+    cout << "Number of iterations: " << counter << '\n';
+    return 0;
 }

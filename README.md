@@ -2,11 +2,11 @@
 
 
 ## Preview
-<div align="center">
-  <video src="output.mp4" controls="controls" muted="muted" autoplay="autoplay" loop="loop" width="400">
-    Your browser does not support the video tag.
-  </video>
-</div>
+
+
+https://github.com/user-attachments/assets/898974f5-e123-42d0-85c4-0214b8134ca6
+
+
 
 ## Brief
 This uses GPU accelerated 4th order Runge-Kutta method for simulation as when i tried doing this project on cpu, it was very slow. Currently takes just 0.5 seconds for 1000x1000 render for 5000 iterations

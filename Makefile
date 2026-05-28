@@ -9,10 +9,10 @@ OBJS = $(SRCS:.cpp=.o)
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
-	$(CXX) -o $(TARGET) $(OBJS) -lsfml-graphics -lsfml-window -lsfml-system
+	$(CXX) -o $(TARGET) -g $(OBJS) -lsfml-graphics -lsfml-window -lsfml-system
 
 %.o: %.cpp
-	$(CXX) -c $< -o $@
+	$(CXX) -c -g $< -o $@
 
 run: $(TARGET)
 	./$(TARGET)

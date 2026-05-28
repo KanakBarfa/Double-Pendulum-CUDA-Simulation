@@ -6,9 +6,9 @@
 #include <algorithm>
 #include <SFML/Graphics.hpp>
 #define M_PII 3.14159265358979323846f
-#define MAX_ITER 500000
+#define MAX_ITER 5000
+#define N 1000
 
-const int N = 200;
 const float g = 9.81f;
 const float mass = 1.0f;
 const float timeStep = 0.01f;
@@ -53,26 +53,23 @@ void rk4_step(std::array<float, 4>& state) {
 }
 
 int main() {
-    std::ios_base::sync_with_stdio(false);
-    std::cin.tie(nullptr);
-
     sf::RenderWindow window(sf::VideoMode({N, N}), "Double Pendulum Simulation");
 
     std::vector<std::uint8_t> pixels(N * N * 4);
+    std::vector<bool> flipped(N * N, false);
+    float theta1, theta2;
+    std::vector<std::array<float, 4>> states(N * N);
 
     for (int i = 0; i < N * N * 4; ++i) {
         pixels[i] = 255;
     }
 
-    float thetas1[N*N], thetas2[N*N];
-    std::array<float, 4> states[N*N];
-
     for (int i = 0; i < N ; ++i) {
         for (int j = 0; j < N; ++j) {
             int idx = i * N + j;
-            thetas1[idx] = -180.0f + (360.0f * i )/ (N-1);
-            thetas2[idx] = -180.0f + (360.0f * j )/ (N-1);
-            states[idx] = {thetas1[idx] * M_PII / 180.0f, thetas2[idx] * M_PII / 180.0f, 0.0f, 0.0f};
+            theta1 = -180.0f + (360.0f * i )/ (N-1);
+            theta2 = -180.0f + (360.0f * j )/ (N-1);
+            states[idx] = {theta1 * M_PII / 180.0f, theta2 * M_PII / 180.0f, 0.0f, 0.0f};
         }
     }
 
@@ -93,19 +90,21 @@ int main() {
 
         counter++;
         if (counter > MAX_ITER) {
-            std::cout << "Simulation stabilized without flipping.\n";
             break;
         }
 
-
         for (int i = 0; i < N*N; ++i) {
+
+            if (flipped[i]) continue;
+
             rk4_step(states[i]);
 
             if (std::abs(states[i][0]) > M_PII || std::abs(states[i][1]) > M_PII) {
-                pixels[4*i] = 0;
+                pixels[4*i] = 255 * (counter / static_cast<float>(MAX_ITER));
                 pixels[4*i + 1] = 0;
-                pixels[4*i + 2] = 0;
+                pixels[4*i + 2] = 255 - 255 * (counter / static_cast<float>(MAX_ITER));
                 pixels[4*i + 3] = 255;
+                flipped[i] = true;
             }
         }
         texture.update(pixels.data());

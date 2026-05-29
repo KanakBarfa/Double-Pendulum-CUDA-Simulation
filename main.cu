@@ -2,8 +2,8 @@
 #include <cuda_runtime.h>
 #include <SFML/Graphics.hpp>
 #include <algorithm>
-#define N 1000
-#define MAX_ITER 5000
+#define N 4000
+#define MAX_ITER 50000
 #define M_PII 3.14159265358979323846f
 
 const float time_step = 0.01f;
@@ -134,7 +134,7 @@ void render_graph(int *final)
     }
 }
 
-void render_video(int *final, int fps)
+void save_video(int *final, int fps)
 {
     std::vector<std::uint8_t> pixels(N * N * 4, 255);
 
@@ -171,7 +171,31 @@ void render_video(int *final, int fps)
     pclose(ffmpeg);
 }
 
-int main()
+void save_image(const int *final, const std::string &filename)
+{
+    std::vector<std::uint8_t> pixels(N * N * 4, 255);
+    for (int i = 0; i < N * N; i++)
+    {
+        if (final[i] >= 0)
+        {
+            float t = final[i] / static_cast<float>(MAX_ITER);
+            t = std::pow(t, 0.4f);
+            pixels[4 * i] = static_cast<std::uint8_t>(255.0f * std::clamp(t * 3.0f, 0.0f, 1.0f));
+            pixels[4 * i + 1] = static_cast<std::uint8_t>(255.0f * std::clamp(t * 3.0f - 1.0f, 0.0f, 1.0f));
+            pixels[4 * i + 2] = static_cast<std::uint8_t>(255.0f * std::clamp(t * 3.0f - 2.0f, 0.0f, 1.0f));
+            pixels[4 * i + 3] = 255;
+        }
+    }
+
+    sf::Image image({N,N}, pixels.data());
+    bool success = image.saveToFile(filename);
+    if (!success) {
+        std::cerr << "Failed to save image to " << filename << '\n';
+    }
+
+}
+
+int main(int argc, char *argv[])
 {
     int *d_iterations;
     int *final;
@@ -200,9 +224,15 @@ int main()
     cudaFree(state);
     cudaFree(d_iterations);
 
-    // Rendering
-    render_graph(final);
-    // render_video(final,60);
+
+    if (argc > 1 && string(argv[1]) == "video") {
+        save_video(final, 60);
+    } else if (argc > 1 && string(argv[1]) == "graph") {
+        render_graph(final);
+    }
+    else{
+        save_image(final, "output.png");
+    }
 
     cudaFreeHost(final);
 }

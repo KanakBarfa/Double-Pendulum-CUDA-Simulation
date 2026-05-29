@@ -3,8 +3,7 @@
 
 ## Preview
 
-
-https://github.com/user-attachments/assets/898974f5-e123-42d0-85c4-0214b8134ca6
+<img src="output.png" alt="Preview of the double pendulum fractal" width="500"/>
 
 
 

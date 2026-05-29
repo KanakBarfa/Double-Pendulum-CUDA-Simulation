@@ -2,8 +2,6 @@
 #include <cuda_runtime.h>
 #include <SFML/Graphics.hpp>
 #include <algorithm>
-#define N 4000
-#define MAX_ITER 50000
 #define M_PII 3.14159265358979323846f
 
 const float time_step = 0.01f;
@@ -30,7 +28,7 @@ __device__ void calc_derivatives(const float *s, float *out)
     out[3] = (2.0f * sinf(delta) * (2.0f * w1 * w1 * l + 2.0f * gravity * cosf(t1) + w2 * w2 * l * cosf(delta))) / denom;
 }
 
-__global__ void sim(const float *state, int *d_iter)
+__global__ void sim(const float *state, int *d_iter, int N, int MAX_ITER)
 {
     int idx = blockDim.x * blockIdx.x + threadIdx.x;
     if (idx >= N * N)
@@ -46,6 +44,7 @@ __global__ void sim(const float *state, int *d_iter)
     float k1[4], k2[4], k3[4], k4[4], temp[4];
 
     int counter = 0;
+    d_iter[idx] = MAX_ITER;
     while (counter < MAX_ITER)
     {
         counter++;
@@ -72,13 +71,22 @@ __global__ void sim(const float *state, int *d_iter)
         if (fabsf(s[0]) > M_PII || fabsf(s[1]) > M_PII)
         {
             d_iter[idx] = counter;
-            return;
+            break;
         }
     }
-    d_iter[idx] = MAX_ITER;
+    uint8_t* p = (uint8_t*)d_iter;
+    if (d_iter[idx] >= 0)
+    {
+        float t = d_iter[idx] / static_cast<float>(MAX_ITER);
+        t = powf(t, 0.4f);
+        p[4 * idx] = static_cast<std::uint8_t>(255.0f * fminf(t * 3.0f, 1.0f));
+        p[4 * idx + 1] = static_cast<std::uint8_t>(255.0f * fminf(t * 3.0f - 1.0f, 1.0f));
+        p[4 * idx + 2] = static_cast<std::uint8_t>(255.0f * fminf(t * 3.0f - 2.0f, 1.0f));
+        p[4 * idx + 3] = 255;
+    }
 }
 
-__global__ void init(float *state, int *d_iter)
+__global__ void init(float *state, int *d_iter, int N)
 {
     int idx = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -92,147 +100,52 @@ __global__ void init(float *state, int *d_iter)
     }
 }
 
-void render_graph(int *final)
+void save_image(const uint8_t *pixels, const std::string &filename, unsigned int N)
 {
-    sf::RenderWindow window(sf::VideoMode({N, N}), "Double Pendulum Simulation");
-    std::vector<std::uint8_t> pixels(N * N * 4, 0);
-    sf::Texture texture;
-    bool flag = texture.resize({N, N});
-    texture.update(pixels.data());
-    sf::Sprite sprite(texture);
-
-    int counter = 0;
-    while (window.isOpen())
-    {
-        while (const std::optional event = window.pollEvent())
-        {
-            if (event->is<sf::Event::Closed>())
-            {
-                window.close();
-            }
-        }
-        if (counter < MAX_ITER)
-        {
-            for (int i = 0; i < N * N; i++)
-            {
-                if (final[i] == counter)
-                {
-                    float t = counter / static_cast<float>(MAX_ITER);
-                    t = std::pow(t, 0.4f);
-                    pixels[4 * i] = static_cast<std::uint8_t>(255.0f * std::clamp(t * 3.0f, 0.0f, 1.0f));
-                    pixels[4 * i + 1] = static_cast<std::uint8_t>(255.0f * std::clamp(t * 3.0f - 1.0f, 0.0f, 1.0f));
-                    pixels[4 * i + 2] = static_cast<std::uint8_t>(255.0f * std::clamp(t * 3.0f - 2.0f, 0.0f, 1.0f));
-                    pixels[4 * i + 3] = 255;
-                }
-            }
-            texture.update(pixels.data());
-            window.clear();
-            window.draw(sprite);
-            window.setTitle("Iteration: " + std::to_string(++counter));
-            window.display();
-        }
-    }
-}
-
-void save_video(int *final, int fps)
-{
-    std::vector<std::uint8_t> pixels(N * N * 4, 255);
-
-    std::string cmd = "ffmpeg -y -f rawvideo -vcodec rawvideo -pix_fmt rgba -s " + 
-                      std::to_string(N) + "x" + std::to_string(N) + 
-                      " -r " + std::to_string(fps) + 
-                      " -i - -c:v libx264 -preset fast -crf 18 -pix_fmt yuv420p output.mp4";
-    
-    FILE* ffmpeg = popen(cmd.c_str(), "w");
-
-    for (int counter = 1; counter <= MAX_ITER; ++counter)
-    {
-        float t = counter / static_cast<float>(MAX_ITER);
-        t = std::pow(t, 0.4f);
-
-        for (int i = 0; i < N * N; i++)
-        {
-            if (final[i] == counter)
-            {
-                pixels[4 * i] = static_cast<std::uint8_t>(255.0f * std::clamp(t * 3.0f, 0.0f, 1.0f));
-                pixels[4 * i + 1] = static_cast<std::uint8_t>(255.0f * std::clamp(t * 3.0f - 1.0f, 0.0f, 1.0f));
-                pixels[4 * i + 2] = static_cast<std::uint8_t>(255.0f * std::clamp(t * 3.0f - 2.0f, 0.0f, 1.0f));
-                pixels[4 * i + 3] = 255;
-            }
-        }
-        
-        fwrite(pixels.data(), 1, N * N * 4, ffmpeg);
-
-        if (counter % 100 == 0) {
-            std::cout << "Encoded frame " << counter << " / " << MAX_ITER << '\n';
-        }
-    }
-
-    pclose(ffmpeg);
-}
-
-void save_image(const int *final, const std::string &filename)
-{
-    std::vector<std::uint8_t> pixels(N * N * 4, 255);
-    for (int i = 0; i < N * N; i++)
-    {
-        if (final[i] >= 0)
-        {
-            float t = final[i] / static_cast<float>(MAX_ITER);
-            t = std::pow(t, 0.4f);
-            pixels[4 * i] = static_cast<std::uint8_t>(255.0f * std::clamp(t * 3.0f, 0.0f, 1.0f));
-            pixels[4 * i + 1] = static_cast<std::uint8_t>(255.0f * std::clamp(t * 3.0f - 1.0f, 0.0f, 1.0f));
-            pixels[4 * i + 2] = static_cast<std::uint8_t>(255.0f * std::clamp(t * 3.0f - 2.0f, 0.0f, 1.0f));
-            pixels[4 * i + 3] = 255;
-        }
-    }
-
-    sf::Image image({N,N}, pixels.data());
+    sf::Image image({N,N}, pixels);
     bool success = image.saveToFile(filename);
     if (!success) {
         std::cerr << "Failed to save image to " << filename << '\n';
     }
-
 }
 
 int main(int argc, char *argv[])
 {
+    unsigned int N = 1000;
+    unsigned int MAX_ITER = 1000;
+    if (argc > 1) {
+        N = std::stoi(argv[1]);
+    }
+    if (argc > 2) {
+        MAX_ITER = std::stoi(argv[2]);
+    }
+
     int *d_iterations;
-    int *final;
+    float *state, ms;
     cudaEvent_t start, end;
     cudaEventCreate(&start);
     cudaEventCreate(&end);
+    uint8_t *final;
+    cudaMallocHost(&final, N * N *4* sizeof(uint8_t));
     cudaMalloc(&d_iterations, N * N * sizeof(int));
-    cudaMallocHost(&final, N * N * sizeof(int));
-
-    float *state, ms;
     cudaMalloc(&state, N * N * 4 * sizeof(float));
-
+    
     cudaEventRecord(start);
-
-    init<<<(N * N + 255) / 256, 256>>>(state, d_iterations);
-    sim<<<(N * N + 255) / 256, 256>>>(state, d_iterations);
+    
+    init<<<(N * N + 255) / 256, 256>>>(state, d_iterations, N);
+    sim<<<(N * N + 255) / 256, 256>>>(state, d_iterations, N, MAX_ITER);
 
     cudaEventRecord(end);
-
-    cudaMemcpy(final, d_iterations, N * N * sizeof(int), cudaMemcpyDeviceToHost);
+    cudaEventSynchronize(end);
     cudaEventElapsedTime(&ms, start, end);
-
+    
     cout << "Elapsed: " << ms << " ms\n";
+    cudaMemcpy(final, d_iterations, N * N * sizeof(int), cudaMemcpyDeviceToHost);
+    save_image(final, "output.png", N);
+    
     cudaEventDestroy(start);
     cudaEventDestroy(end);
     cudaFree(state);
     cudaFree(d_iterations);
-
-
-    if (argc > 1 && string(argv[1]) == "video") {
-        save_video(final, 60);
-    } else if (argc > 1 && string(argv[1]) == "graph") {
-        render_graph(final);
-    }
-    else{
-        save_image(final, "output.png");
-    }
-
     cudaFreeHost(final);
 }

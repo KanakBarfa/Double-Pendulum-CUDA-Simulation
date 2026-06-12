@@ -1,5 +1,5 @@
 NVCC = nvcc
-NVCCFLAGS = -O3
+NVCCFLAGS = -O3 -use_fast_math
 LDFLAGS = -lsfml-graphics -lsfml-window -lsfml-system
 
 all: main

@@ -10,101 +10,102 @@ const float l = 1.0f;
 
 using namespace std;
 
-__device__ void calc_derivatives(const float *s, float *out)
+__device__ void calc_derivatives(float4 s, float4 &out)
 {
-    float t1 = s[0];
-    float t2 = s[1];
-    float w1 = s[2];
-    float w2 = s[3];
+    float delta = s.x - s.y;
+    float sin_delta, cos_delta;
+    sincosf(delta, &sin_delta, &cos_delta);
+    float sin_t1, cos_t1;
+    sincosf(s.x, &sin_t1, &cos_t1);
 
-    float delta = t1 - t2;
-    float denom = l * (3.0f - cosf(2.0f * t1 - 2.0f * t2));
+    float inv_denom = 1.0f / (l * (2.0f + 2.0f * sin_delta * sin_delta));
+    float z2_l = s.z * s.z * l;
+    float w2_l = s.w * s.w * l;
 
-    out[0] = w1;
-    out[1] = w2;
-    out[2] = (-gravity * (3.0f * sinf(t1) + sinf(t1 - 2.0f * t2)) -
-              2.0f * sinf(delta) * (w2 * w2 * l + w1 * w1 * l * cosf(delta))) /
-             denom;
-    out[3] = (2.0f * sinf(delta) * (2.0f * w1 * w1 * l + 2.0f * gravity * cosf(t1) + w2 * w2 * l * cosf(delta))) / denom;
+    out.x = s.z;
+    out.y = s.w;
+    out.z = (-gravity * (3.0f * sin_t1 + sinf(s.x - 2.0f * s.y)) -
+             2.0f * sin_delta * (w2_l + z2_l * cos_delta)) *
+            inv_denom;
+    out.w = (2.0f * sin_delta * (2.0f * z2_l + 2.0f * gravity * cos_t1 + w2_l * cos_delta)) * inv_denom;
 }
 
-__global__ void sim(const float *state, int *d_iter, int N, int MAX_ITER)
+__global__ void sim(const float4 *state, uchar4 *d_out, int N, int MAX_ITER)
 {
     int idx = blockDim.x * blockIdx.x + threadIdx.x;
     if (idx >= N * N)
         return;
 
-    int base = idx * 4;
-    float s[4];
-    s[0] = state[base];
-    s[1] = state[base + 1];
-    s[2] = state[base + 2];
-    s[3] = state[base + 3];
-
-    float k1[4], k2[4], k3[4], k4[4], temp[4];
+    float4 s = state[idx];
+    float4 k1, k2, k3, k4, temp;
 
     int counter = 0;
-    d_iter[idx] = MAX_ITER;
     while (counter < MAX_ITER)
     {
         counter++;
 
         calc_derivatives(s, k1);
 
-        for (int i = 0; i < 4; ++i)
-            temp[i] = s[i] + 0.5f * time_step * k1[i];
+        temp.x = s.x + 0.5f * time_step * k1.x;
+        temp.y = s.y + 0.5f * time_step * k1.y;
+        temp.z = s.z + 0.5f * time_step * k1.z;
+        temp.w = s.w + 0.5f * time_step * k1.w;
         calc_derivatives(temp, k2);
 
-        for (int i = 0; i < 4; ++i)
-            temp[i] = s[i] + 0.5f * time_step * k2[i];
+        temp.x = s.x + 0.5f * time_step * k2.x;
+        temp.y = s.y + 0.5f * time_step * k2.y;
+        temp.z = s.z + 0.5f * time_step * k2.z;
+        temp.w = s.w + 0.5f * time_step * k2.w;
         calc_derivatives(temp, k3);
 
-        for (int i = 0; i < 4; ++i)
-            temp[i] = s[i] + time_step * k3[i];
+        temp.x = s.x + time_step * k3.x;
+        temp.y = s.y + time_step * k3.y;
+        temp.z = s.z + time_step * k3.z;
+        temp.w = s.w + time_step * k3.w;
         calc_derivatives(temp, k4);
 
-        for (int i = 0; i < 4; ++i)
-        {
-            s[i] += (time_step / 6.0f) * (k1[i] + 2.0f * k2[i] + 2.0f * k3[i] + k4[i]);
-        }
+        s.x += (time_step / 6.0f) * (k1.x + 2.0f * k2.x + 2.0f * k3.x + k4.x);
+        s.y += (time_step / 6.0f) * (k1.y + 2.0f * k2.y + 2.0f * k3.y + k4.y);
+        s.z += (time_step / 6.0f) * (k1.z + 2.0f * k2.z + 2.0f * k3.z + k4.z);
+        s.w += (time_step / 6.0f) * (k1.w + 2.0f * k2.w + 2.0f * k3.w + k4.w);
 
-        if (fabsf(s[0]) > M_PII || fabsf(s[1]) > M_PII)
+        if (fabsf(s.x) > M_PII || fabsf(s.y) > M_PII)
         {
-            d_iter[idx] = counter;
             break;
         }
     }
-    uint8_t* p = (uint8_t*)d_iter;
-    if (d_iter[idx] >= 0)
-    {
-        float t = d_iter[idx] / static_cast<float>(MAX_ITER);
-        t = powf(t, 0.4f);
-        p[4 * idx] = static_cast<std::uint8_t>(255.0f * fminf(t * 3.0f, 1.0f));
-        p[4 * idx + 1] = static_cast<std::uint8_t>(255.0f * fminf(t * 3.0f - 1.0f, 1.0f));
-        p[4 * idx + 2] = static_cast<std::uint8_t>(255.0f * fminf(t * 3.0f - 2.0f, 1.0f));
-        p[4 * idx + 3] = 255;
-    }
+
+    float t = counter / static_cast<float>(MAX_ITER);
+    t = powf(t, 0.4f);
+    uchar4 color;
+    color.x = static_cast<std::uint8_t>(255.0f * fminf(t * 3.0f, 1.0f));
+    color.y = static_cast<std::uint8_t>(255.0f * fminf(t * 3.0f - 1.0f, 1.0f));
+    color.z = static_cast<std::uint8_t>(255.0f * fminf(t * 3.0f - 2.0f, 1.0f));
+    color.w = 255;
+    d_out[idx] = color;
 }
 
-__global__ void init(float *state, int *d_iter, int N)
+__global__ void init(float4 *state, int N)
 {
     int idx = blockDim.x * blockIdx.x + threadIdx.x;
 
     if (idx < N * N)
     {
-        state[idx << 2] = M_PII * (-1.0f + (2.0f * (idx / N)) / (N - 1));
-        state[(idx << 2) + 1] = M_PII * (-1.0f + (2.0f * (idx % N)) / (N - 1));
-        state[(idx << 2) + 2] = 0.0f;
-        state[(idx << 2) + 3] = 0.0f;
-        d_iter[idx] = -1;
+        float4 s;
+        s.x = M_PII * (-1.0f + (2.0f * (idx / N)) / (N - 1));
+        s.y = M_PII * (-1.0f + (2.0f * (idx % N)) / (N - 1));
+        s.z = 0.0f;
+        s.w = 0.0f;
+        state[idx] = s;
     }
 }
 
 void save_image(const uint8_t *pixels, const std::string &filename, unsigned int N)
 {
-    sf::Image image({N,N}, pixels);
+    sf::Image image({N, N}, pixels);
     bool success = image.saveToFile(filename);
-    if (!success) {
+    if (!success)
+    {
         std::cerr << "Failed to save image to " << filename << '\n';
     }
 }
@@ -120,32 +121,33 @@ int main(int argc, char *argv[])
         MAX_ITER = std::stoi(argv[2]);
     }
 
-    int *d_iterations;
-    float *state, ms;
+    uchar4 *d_out;
+    float4 *state;
+    float ms;
     cudaEvent_t start, end;
     cudaEventCreate(&start);
     cudaEventCreate(&end);
     uint8_t *final;
     cudaMallocHost(&final, N * N *4* sizeof(uint8_t));
-    cudaMalloc(&d_iterations, N * N * sizeof(int));
-    cudaMalloc(&state, N * N * 4 * sizeof(float));
-    
+    cudaMalloc(&d_out, N * N * sizeof(uchar4));
+    cudaMalloc(&state, N * N * sizeof(float4));
+
     cudaEventRecord(start);
-    
-    init<<<(N * N + 255) / 256, 256>>>(state, d_iterations, N);
-    sim<<<(N * N + 255) / 256, 256>>>(state, d_iterations, N, MAX_ITER);
+
+    init<<<(N * N + 255) / 256, 256>>>(state, N);
+    sim<<<(N * N + 255) / 256, 256>>>(state, d_out, N, MAX_ITER);
 
     cudaEventRecord(end);
     cudaEventSynchronize(end);
     cudaEventElapsedTime(&ms, start, end);
-    
+
     cout << "Elapsed: " << ms << " ms\n";
-    cudaMemcpy(final, d_iterations, N * N * sizeof(int), cudaMemcpyDeviceToHost);
+    cudaMemcpy(final, d_out, N * N * sizeof(uchar4), cudaMemcpyDeviceToHost);
     save_image(final, "output.png", N);
-    
+
     cudaEventDestroy(start);
     cudaEventDestroy(end);
     cudaFree(state);
-    cudaFree(d_iterations);
+    cudaFree(d_out);
     cudaFreeHost(final);
 }

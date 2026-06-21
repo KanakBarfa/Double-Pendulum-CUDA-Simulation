@@ -3,12 +3,12 @@
 
 ## Preview
 
-<img src="output.png" alt="Preview of the double pendulum fractal" width="500"/>
+<img src="output.png" alt="Double pendulum fractal [1000x1000] 1 million iterations in 12 seconds" width="500"/>
 
 
 
 ## Brief
-This uses GPU accelerated 4th order Runge-Kutta method for simulation as when i tried doing this project on cpu, it was very slow. Currently takes just 0.5 seconds for 1000x1000 render for 5000 iterations
+This uses GPU accelerated 4th order Runge-Kutta method for simulation as when i tried doing this project on cpu, it was very slow. Currently takes just 0.1 seconds for 1000x1000 render for 5000 iterations
 
 ## Building and Running
 
